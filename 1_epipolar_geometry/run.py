@@ -17,21 +17,23 @@ K = np.loadtxt(f'scene/K.txt')
 correspondences = get_correspondences(matches, points_1, points_2)
 inverse_correspondences = correspondences[:, [2, 3, 0, 1]]
 calibrated_correspondences = calibrate_correspondences(correspondences, K)
-P2, E, inliers = epipolar_ransac(calibrated_correspondences, 100)
+P2, E, inliers = epipolar_ransac(calibrated_correspondences, 25)
 
 K_inv = np.linalg.inv(K)
 F = K_inv.T @ E @ K_inv
 
-fig, axes = plt.subplots(1, 2)
-ax1, ax2 = axes
+fig, axes = plt.subplots(2, 2)
+ax1, ax2, ax3, ax4 = axes.flatten()
 
 show_image(image_1, ax1)
 show_image(image_2, ax2)
+show_image(image_1, ax3)
+show_image(image_2, ax4)
 
-show_epipolar_lines(correspondences[inliers], F, ax1, ax2, width, height, each=100)
+show_epipolar_lines(correspondences[inliers], F, ax1, ax2, width, height, n_lines=15)
 
-# show_needle_map(correspondences[inliers], c='tab:red', ax=ax1)
-# show_needle_map(inverse_correspondences[inliers], c='tab:blue', ax=ax2)
+show_needle_map(correspondences[inliers], c='tab:red', ax=ax3)
+show_needle_map(inverse_correspondences[inliers], c='tab:blue', ax=ax4)
 
 plt.tight_layout()
 plt.show()

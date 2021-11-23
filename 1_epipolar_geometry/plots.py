@@ -6,8 +6,8 @@ def show_needle_map(correspondences, c='r', ax=None):
     if ax is not None:
         plt = ax
     for x1, y1, x2, y2 in correspondences:
-        plt.plot([x1, x2], [y1, y2], c=c, linewidth=1)
-    plt.scatter(correspondences[:, 0], correspondences[:, 1], marker='o', s=5, c=c)
+        plt.plot([x1, x2], [y1, y2], c=c, linewidth=0.75, alpha=0.75)
+    plt.scatter(correspondences[:, 0], correspondences[:, 1], marker='o', s=2.5, c=c)
 
 def show_image(image, ax):
     height, width = image.shape[0], image.shape[1]
@@ -27,11 +27,13 @@ def show_line(line, width, height, ax):
     ax.plot([x1, x2], [y1, y2])
 
 
-def show_epipolar_lines(correspondences, F, ax1, ax2, width, height, each=100):
+def show_epipolar_lines(correspondences, F, ax1, ax2, width, height, n_lines=10):
     N = len(correspondences)
+
+    indices = np.random.choice(range(N), size=n_lines, replace=False)
+    correspondences = correspondences[indices]
     
-    for i in range(0, N, each):
-        u1, v1, u2, v2 = correspondences[i]
+    for u1, v1, u2, v2 in correspondences:
         m1 = np.array([u1, v1, 1])
         m2 = np.array([u2, v2, 1])
 
