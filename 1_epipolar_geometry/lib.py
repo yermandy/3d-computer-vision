@@ -1,5 +1,7 @@
 import numpy as np
 import p5
+import math
+
 
 def line_from_points(x1, y1, x2, y2):
     return np.cross([x1, y1, 1], [x2, y2, 1])
@@ -60,6 +62,7 @@ def sqc(x):
 def p2e(X):
     #  in shape = (D, N)
     # out shape = (D - 1, N)
+    X = np.array(X)
     return X[:-1] / X[-1]
 
 
@@ -85,6 +88,9 @@ def Pu2X(P1, P2, u1p, u2p):
             u2 * p23 - p21,
             v2 * p23 - p22
         ])
+
+        # TODO numerical conditioning
+        # print(np.max(D) - np.min(D))
 
         _, _, V_t = np.linalg.svd(D)
 
@@ -154,6 +160,12 @@ def reprojection_error(UV, P1, P2):
 
     return e
 
+def calc_F(K, E):
+    K_inv = np.linalg.inv(K)
+    F = K_inv.T @ E @ K_inv
+    return F
+
+
 def epipolar_ransac(correspondences, n_iters, support_function=mle_support, theta=0.00001, n_samples=5):
     N = len(correspondences)
     support_best = 0
@@ -170,19 +182,7 @@ def epipolar_ransac(correspondences, n_iters, support_function=mle_support, thet
 
         Es = p5.p5gb(u1p, u2p)
 
-        for E in Es:
-            # print(E)
-
-            U, D, V_t = np.linalg.svd(E)
-
-            # det_U = np.linalg.det(U)
-            # print(det_U)
-            # det_V = np.linalg.det(V_t)
-            # print(det_V)
-
-            # print('U:\n', U)
-            # print('V:\n', V_t)
-            
+        for E in Es:            
             R, t = Eu2Rt(E, u1p, u2p)
 
             # calculate reprojection error
@@ -200,3 +200,32 @@ def epipolar_ransac(correspondences, n_iters, support_function=mle_support, thet
                 print(support_best)
 
     return P2_best, E_best, inliers_best
+
+def Rx(alpha):
+    cos_alpha = math.cos(alpha)
+    sin_alpha = math.sin(alpha)
+    return np.array([
+        [1, 0, 0],
+        [0, cos_alpha, -sin_alpha],
+        [0, sin_alpha, cos_alpha]
+    ])
+
+
+def Ry(alpha):
+    cos_alpha = math.cos(alpha)
+    sin_alpha = math.sin(alpha)
+    return np.array([
+        [cos_alpha, 0, sin_alpha],
+        [0, 1, 0],
+        [-sin_alpha, 0, cos_alpha]
+    ])
+
+
+def Rz(alpha):
+    cos_alpha = math.cos(alpha)
+    sin_alpha = math.sin(alpha)
+    return np.array([
+        [cos_alpha, -sin_alpha, 0],
+        [sin_alpha, cos_alpha, 0],
+        [0, 0, 1]
+    ])

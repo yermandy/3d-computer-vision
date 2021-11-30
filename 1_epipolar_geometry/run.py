@@ -18,9 +18,7 @@ correspondences = get_correspondences(matches, points_1, points_2)
 inverse_correspondences = correspondences[:, [2, 3, 0, 1]]
 calibrated_correspondences = calibrate_correspondences(correspondences, K)
 P2, E, inliers = epipolar_ransac(calibrated_correspondences, 25)
-
-K_inv = np.linalg.inv(K)
-F = K_inv.T @ E @ K_inv
+F = calc_F(K, E)
 
 fig, axes = plt.subplots(2, 2)
 ax1, ax2, ax3, ax4 = axes.flatten()

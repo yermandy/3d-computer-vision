@@ -45,3 +45,32 @@ def show_epipolar_lines(correspondences, F, ax1, ax2, width, height, n_lines=10)
 
         show_line(l1, width, height, ax1)
         show_line(l2, width, height, ax2)
+
+
+def show_camera_3d(ax, P):
+    R, С = P[:, :3], -P[:, 3]
+
+    ax.quiver(*С, *(R.T @ ([1, 0, 0])), color='b', arrow_length_ratio=0.2)
+    ax.quiver(*С, *(R.T @ ([0, 1, 0])), color='g', arrow_length_ratio=0.2)
+    ax.quiver(*С, *(R.T @ ([0, 0, 1])), color='r', arrow_length_ratio=0.2)
+
+    ax.scatter(*С, c='k')
+
+
+
+if __name__ == '__main__':
+    fig = plt.figure()
+    ax = fig.add_subplot(projection='3d')
+    ax.set_xlim3d(-3, 3)
+    ax.set_ylim3d(-3, 3)
+    ax.set_zlim3d(-1, 5)
+
+    R = Ry(np.pi / 4)
+    P1 = np.c_[np.diag([1, 1 ,1]), [0, 0, 0]]
+    P2 = np.c_[R, [1, 0, 1]]
+    P2 = np.load('P2.npy')
+
+    show_camera_3d(ax, P1)
+    show_camera_3d(ax, P2)
+
+    plt.show()
