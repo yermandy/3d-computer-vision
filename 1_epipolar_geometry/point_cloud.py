@@ -1,8 +1,8 @@
 from plots import *
 from lib import *    
 
-image_id_1 = 1
-image_id_2 = 4
+image_id_1 = 7
+image_id_2 = 11
 
 image_1 = plt.imread(f'scene/images/{image_id_1:02d}.jpg')
 image_2 = plt.imread(f'scene/images/{image_id_2:02d}.jpg')
@@ -17,15 +17,13 @@ K = np.loadtxt(f'scene/K.txt')
 correspondences = get_correspondences(matches, points_1, points_2)
 inverse_correspondences = correspondences[:, [2, 3, 0, 1]]
 calibrated_correspondences = calibrate_correspondences(correspondences, K)
-P2, E, inliers = epipolar_ransac(calibrated_correspondences, 50)
+P2, E, inliers = epipolar_ransac(calibrated_correspondences, 20, theta=1e-3, K=K)
 F = calc_F(K, E)
+P1 = get_P1()
 
-u1p = calibrated_correspondences[inliers, 0:3].T
-u2p = calibrated_correspondences[inliers, 3:6].T
+X = reconstruct_point_cloud(calibrated_correspondences[inliers], P1, P2)
 
-P1 = np.c_[np.diag([1, 1 ,1]), [0, 0, 0]]
-X = Pu2X(P1, P2, u1p, u2p)
-X = p2e(X)
+print(X.shape)
 
 fig, axes = plt.subplots(2, 2)
 ax1, ax2, ax3, ax4 = axes.flatten()
@@ -55,4 +53,5 @@ ax.scatter(X[0], X[1], X[2], marker='.')
 show_camera_3d(ax, P1)
 show_camera_3d(ax, P2)
 
+plt.subplots_adjust(0, 0, 1, 1)
 plt.show()

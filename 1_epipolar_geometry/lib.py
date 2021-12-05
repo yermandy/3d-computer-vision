@@ -115,7 +115,6 @@ def Eu2Rt(E, u1p, u2p):
     t = np.array([0, 0, 0])
 
     P1 = np.c_[R, t]
-    p11, p12, p13 = P1
 
     for a in [-1, 1]:
         for b in [-1, 1]:
@@ -127,17 +126,28 @@ def Eu2Rt(E, u1p, u2p):
             
             R = U @ W @ V_t
             t = b * U[:, -1]
+            
+            # Should it be here?
+            if np.linalg.det(R) < 0:
+                R = -R
+                t = -t
+
             P2 = np.c_[R, t]
 
             # cheirality constraint https://cmsc426.github.io/sfm/#tri
             X = Pu2X(P1, P2, u1p, u2p)
+            X /= X[-1]
+
+            if np.any(X[2] < 0):
+                continue
+            
             X = p2e(X)
             cheirality = R[2] @ (X - t.reshape(-1, 1))
 
             if np.all(cheirality > 0):
                 return R, t
-            
-    return R, t
+    
+    return None, None
 
 
 def reprojection_error(UV, P1, P2):
@@ -160,13 +170,55 @@ def reprojection_error(UV, P1, P2):
 
     return e
 
+
+def P2F(P1, P2):
+    Q1, q1 = P1[:, :-1], P1[:, -1]
+    Q2, q2 = P2[:, :-1], P2[:, -1]
+    Q1_Q2_inv = Q1 @ np.linalg.inv(Q2)
+    F = Q1_Q2_inv.T @ sqc(q1 - Q1_Q2_inv @ q2)
+    return F
+
+
+def sampson_error(UV, P1, P2, return_vectors=False):
+    F = P2F(P1, P2)
+
+    x = UV[:, :3]
+    y = UV[:, 3:]
+
+    S = [[1, 0, 0], [0, 1, 0]]
+
+    SF_t = S @ F.T
+    SF = S @ F
+
+    sampson_errors = []
+    sampson_vectors = []
+    for x_i, y_i in zip(x, y):
+        # epipolar algebraic error
+        e_i = y_i @ F @ x_i
+        J_i = np.concatenate((SF_t @ y_i, SF @ x_i))
+
+        sampson_vector = -(J_i * e_i) / np.sum(J_i ** 2)
+        sampson_error = np.linalg.norm(sampson_vector)
+        
+        sampson_errors.append(sampson_error)
+        sampson_vectors.append(sampson_vector)
+    
+    sampson_errors = np.array(sampson_errors)
+    sampson_vectors = np.array(sampson_vectors)
+    
+    if return_vectors:
+        return sampson_errors, sampson_vectors
+
+    return sampson_errors
+
+
 def calc_F(K, E):
     K_inv = np.linalg.inv(K)
     F = K_inv.T @ E @ K_inv
     return F
 
 
-def epipolar_ransac(correspondences, n_iters, support_function=mle_support, theta=0.00001, n_samples=5):
+def epipolar_ransac(correspondences, n_iters, support_function=mle_support, theta=0.00001, n_samples=5, K=None):
     N = len(correspondences)
     support_best = 0
     P2_best = None
@@ -185,11 +237,16 @@ def epipolar_ransac(correspondences, n_iters, support_function=mle_support, thet
         for E in Es:            
             R, t = Eu2Rt(E, u1p, u2p)
 
+            if R is None:
+                continue
+
             # calculate reprojection error
             P1 = np.c_[np.diag([1, 1 ,1]), [0, 0, 0]]
             P2 = np.c_[R, t]
             
-            error = reprojection_error(correspondences, P1, P2)
+            error = sampson_error(correspondences, P1, P2)
+            # error = reprojection_error(correspondences, P1, P2)
+
             support, inliers = support_function(error, theta)
             
             if support > support_best:
@@ -229,3 +286,30 @@ def Rz(alpha):
         [sin_alpha, cos_alpha, 0],
         [0, 0, 1]
     ])
+
+
+def get_P1():
+    P1 = np.c_[np.diag([1, 1 ,1]), [0, 0, 0]]
+    return P1
+
+
+def reconstruct_point_cloud(correspondences, P1, P2):
+    u1p = correspondences[:, 0:3].T
+    u2p = correspondences[:, 3:6].T
+
+    _, sampson_vectors = sampson_error(correspondences, P1, P2, True)
+
+    # The Golden Standard Method
+    for i, correction_vector in enumerate(sampson_vectors):
+        u1p[[0, 1], i] -= correction_vector[:2]
+        u2p[[0, 1], i] -= correction_vector[2:]
+
+
+    X = Pu2X(P1, P2, u1p, u2p)
+    X = p2e(X)
+
+    mask_in_front = X[:, -2] > 0
+    
+    X = X[mask_in_front]
+
+    return X
