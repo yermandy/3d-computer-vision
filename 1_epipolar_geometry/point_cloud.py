@@ -39,7 +39,6 @@ show_needle_map(correspondences[inliers], c='tab:red', ax=ax3)
 show_needle_map(inverse_correspondences[inliers], c='tab:blue', ax=ax4)
 
 plt.tight_layout()
-# plt.show()
 
 fig = plt.figure()
 
