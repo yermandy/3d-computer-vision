@@ -57,6 +57,20 @@ def show_camera_3d(ax, P):
     ax.scatter(*С, c='k')
 
 
+def create_3d_plot(plt):
+    fig = plt.figure()
+    ax = fig.add_subplot(projection='3d')
+
+    ax.set_xlim3d(-3, 3)
+    ax.set_ylim3d(-3, 3)
+    ax.set_zlim3d(-1, 5)
+
+    return fig, ax
+
+
+def show_point_cloud(X, ax):
+    ax.scatter(X[0], X[1], X[2], marker='.')
+
 
 if __name__ == '__main__':
     fig = plt.figure()

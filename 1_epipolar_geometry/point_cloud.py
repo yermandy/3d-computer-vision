@@ -40,15 +40,9 @@ show_needle_map(inverse_correspondences[inliers], c='tab:blue', ax=ax4)
 
 plt.tight_layout()
 
-fig = plt.figure()
+fig, ax = create_3d_plot(plt)
 
-ax = fig.add_subplot(projection='3d')
-ax.set_xlim3d(-3, 3)
-ax.set_ylim3d(-3, 3)
-ax.set_zlim3d(-1, 5)
-
-ax.scatter(X[0], X[1], X[2], marker='.')
-
+show_point_cloud(X, ax)
 show_camera_3d(ax, P1)
 show_camera_3d(ax, P2)
 
