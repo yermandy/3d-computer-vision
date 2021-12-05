@@ -218,12 +218,27 @@ def calc_F(K, E):
     return F
 
 
+def inliers_in_front_camera(correspondences, inliers, P1, P2):
+    u1p = correspondences[:, 0:3].T
+    u2p = correspondences[:, 3:6].T
+
+    X = Pu2X(P1, P2, u1p, u2p)
+    X = p2e(X)
+
+    mask_in_front = X[2] > 0
+    inliers = inliers & mask_in_front
+    
+    return inliers
+
+
 def epipolar_ransac(correspondences, n_iters, support_function=mle_support, theta=0.00001, n_samples=5, K=None):
     N = len(correspondences)
     support_best = 0
     P2_best = None
     E_best = None
     inliers_best = None
+
+    P1 = get_P1()
     
     for _ in range(n_iters):
         indices = np.random.choice(N, n_samples, replace=False)
@@ -240,11 +255,12 @@ def epipolar_ransac(correspondences, n_iters, support_function=mle_support, thet
             if R is None:
                 continue
 
-            # calculate reprojection error
-            P1 = np.c_[np.diag([1, 1 ,1]), [0, 0, 0]]
             P2 = np.c_[R, t]
             
+            # calculate sampson error
             error = sampson_error(correspondences, P1, P2)
+
+            # calculate reprojection error
             # error = reprojection_error(correspondences, P1, P2)
 
             support, inliers = support_function(error, theta)
@@ -255,6 +271,8 @@ def epipolar_ransac(correspondences, n_iters, support_function=mle_support, thet
                 E_best = E
                 inliers_best = inliers
                 print(support_best)
+
+    inliers_best = inliers_in_front_camera(correspondences, inliers_best, P1, P2)
 
     return P2_best, E_best, inliers_best
 
