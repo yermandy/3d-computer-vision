@@ -37,7 +37,7 @@ def p3p_grunert(Xw, U):
 
     Input:
       Xw .. three 3D points in any coordinate frame (homogeneous, 4x3 matrix),
-      u .. the three point projections (homogeneous, 3x3 matrix, row vectors).
+      u  .. the three point projections (homogeneous, 3x3 matrix, row vectors).
 
     Output:
       Xc .. list, each entry containts the three 3D points in
