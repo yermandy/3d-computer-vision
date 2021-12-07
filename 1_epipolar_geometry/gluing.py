@@ -71,8 +71,6 @@ new_inliers_indices = np.flatnonzero(inliers3)
 
 c.join_camera(next_camera_id, new_inliers_indices)
 
-c.
-
 # print(c.get_cneighbours(next_camera_id))
 
 # c.verify_x(next_camera_id, new_inliers_indices)
