@@ -1,7 +1,9 @@
+from numpy import percentile
 from plots import *
 from lib import *    
 import corresp
 import os
+from easydict import EasyDict as dict
 
 def initialize_c(N=12, verbose=1):
     c = corresp.Corresp(N + 1)
@@ -30,7 +32,6 @@ points_2 = np.loadtxt(f'scene/matches/u_{image_id_2:02d}.txt')
 
 
 correspondences = get_correspondences(matches, points_1, points_2)
-inverse_correspondences = correspondences[:, [2, 3, 0, 1]]
 calibrated_correspondences = calibrate_correspondences(correspondences, K)
 
 if not os.path.isfile('cache/E.npy') or not os.path.isfile('cache/P2.npy') or not os.path.isfile('cache/inliers.npy'):
@@ -66,11 +67,74 @@ u3 = np.loadtxt(f'scene/matches/u_{next_camera_id:02d}.txt').T
 R3, t3, inliers3 = p3p_ransac(X, u3, X2U_idx, K)
 P3 = np.c_[R3, t3]
 
+cameras = {}
+cameras[7] = dict({'P': P1})
+cameras[11] = dict({'P': P2})
+
+cameras[next_camera_id] = dict({'P': P3})
+
 
 new_inliers_indices = np.flatnonzero(inliers3)
 
 c.join_camera(next_camera_id, new_inliers_indices)
 
+verified_cameras = c.get_cneighbours(next_camera_id)
+
+X_from_two = X.copy()
+
+P_j = P3
+
+for verified_camera_id in verified_cameras:
+    
+
+    P_i = cameras[verified_camera_id].P
+
+    c_idx_i, c_idx_j = np.array(c.get_m(next_camera_id, verified_camera_id))
+
+    print('correspondences')
+    print(correspondences.shape)
+    # calibrated_correspondences = calibrate_correspondences(correspondences, K)
+
+    # print(calibrated_correspondences.shape)
+    print('inliers3.shape')
+    print(inliers3.shape)
+
+
+    points_1 = np.loadtxt(f'scene/matches/u_{verified_camera_id:02d}.txt')
+    points_2 = np.loadtxt(f'scene/matches/u_{next_camera_id:02d}.txt')
+
+    matches = np.c_[c_idx_j, c_idx_i]
+    correspondences = get_correspondences(matches, points_1, points_2)
+    calibrated_correspondences = calibrate_correspondences(correspondences, K)
+
+    #! method 1
+    # points_1 = np.loadtxt(f'scene/matches/u_{verified_camera_id:02d}.txt')[c_idx_j]
+    # points_2 = np.loadtxt(f'scene/matches/u_{next_camera_id:02d}.txt')[c_idx_i]
+    # points_1 = np.linalg.inv(K) @ e2p(points_1.T)
+    # points_2 = np.linalg.inv(K) @ e2p(points_2.T)
+    # calibrated_correspondences = np.r_[points_1, points_2].T
+
+    # points_1 = points_1.T
+    # points_2 = points_2.T
+    # correspondences = np.r_[points_1, points_2].T
+    # calibrated_correspondences = calibrate_correspondences(correspondences, K)
+
+    # c.new_x(next_camera_id, verified_camera_id)
+
+    inliers, X_new = reconstruct_point_cloud_2(calibrated_correspondences, P_i, P_j)
+    # Xj = reconstruct_point_cloud(calibrated_correspondences, inliers3, P1, P2, corretion=True)
+
+    X = np.hstack((X, X_new))
+
+    inliers = np.flatnonzero(inliers)
+
+    c.new_x(next_camera_id, verified_camera_id, inliers)
+
+# exit()
+
+
+cameras_next, cameras_points = c.get_green_cameras()
+# exit()
 # print(c.get_cneighbours(next_camera_id))
 
 # c.verify_x(next_camera_id, new_inliers_indices)
@@ -87,8 +151,9 @@ print()
 print(X.shape)
 
 fig, ax = create_3d_plot(plt)
+show_point_cloud(X[:, len(X_from_two):], ax)
+show_point_cloud(X_from_two, ax)
 
-show_point_cloud(X, ax)
 show_camera_3d(ax, P1, 7)
 show_camera_3d(ax, P2, 11)
 show_camera_3d(ax, P3, 3)

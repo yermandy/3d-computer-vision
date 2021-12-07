@@ -52,7 +52,7 @@ def p3p_grunert(Xw, U):
     c = vlen(Xwe[:, 0] - Xwe[:, 1])
 
     if a == 0 or b == 0 or c == 0:
-        print('There are no three unique points')
+        # print('There are no three unique points')
         return []
 
     # ray vectors j1, j2, j3 - length is 1

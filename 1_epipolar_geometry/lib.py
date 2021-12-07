@@ -164,7 +164,7 @@ def Eu2Rt(E, u1p, u2p):
     return None, None
 
 
-def reprojection_error(UV, P1, P2):
+def reprojection_error(UV, P1, P2, return_X=False):
     u1p = UV[:, :3].T
     u2p = UV[:, 3:].T
     
@@ -175,12 +175,18 @@ def reprojection_error(UV, P1, P2):
 
     X = Pu2X(P1, P2, u1p, u2p)
 
+    # what if we normalize it?
+    # X /= X[-1]
+
     p13X = p13 @ X
     p23X = p23 @ X
 
     e1 = (u1 - (p11 @ X) / p13X) ** 2 + (v1 - (p12 @ X) / p13X) ** 2
     e2 = (u2 - (p21 @ X) / p23X) ** 2 + (v2 - (p22 @ X) / p23X) ** 2
     e = e1 + e2
+
+    if return_X:
+        return e, X
 
     return e
 
@@ -347,6 +353,32 @@ def reconstruct_point_cloud(correspondences, inliers, P1, P2, corretion=True):
     return X, new_inliers
 
 
+def reconstruct_point_cloud_2(correspondences, P1, P2, theta=1e-5, corretion=True):
+    u1p = correspondences[:, 0:3].T
+    u2p = correspondences[:, 3:6].T
+
+    if corretion:
+        # The Golden Standard Method
+        _, sampson_vectors = sampson_error(correspondences, P1, P2, True)
+        for i, correction_vector in enumerate(sampson_vectors):
+            u1p[[0, 1], i] -= correction_vector[:2]
+            u2p[[0, 1], i] -= correction_vector[2:]
+
+    correspondences = np.r_[u1p, u2p].T
+
+    errors, X = reprojection_error(correspondences, P1, P2, return_X=True)
+
+    X = p2e(X)
+
+    inliers = errors < theta
+
+    # print(errors)
+
+    print('inliers sum ', inliers.sum())
+
+    return inliers, X[:, inliers]
+
+
 def p3p_ransac(X, u, X2U_idx, K, p=0.99999, theta=2):
     up_K = calibrate_features(u, K)
     up = e2p(u)
@@ -360,7 +392,7 @@ def p3p_ransac(X, u, X2U_idx, K, p=0.99999, theta=2):
     t_best = None
     inliers_best = None
 
-    N_max = 9999
+    N_max = 1000
     N_iter = 0
 
     X_inliers = X[:, X2U_idx[0]]
