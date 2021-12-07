@@ -1,5 +1,6 @@
 import numpy as np
 import p5
+import p3p
 import math
 
 
@@ -23,7 +24,7 @@ def get_correspondences(matches, points_1, points_2):
     return correspondences
 
 
-def calibrate_correspondences(correspondences, K):  
+def calibrate_correspondences(correspondences, K, normalize=False):  
     u1, u2 = correspondences[:, [0, 1]], correspondences[:, [2, 3]]
     u1p = np.c_[u1, np.ones(len(u1))]
     u2p = np.c_[u2, np.ones(len(u2))]
@@ -31,9 +32,18 @@ def calibrate_correspondences(correspondences, K):
 
     u1p = (K_inv @ u1p.T).T
     u2p = (K_inv @ u2p.T).T
+
+    if normalize:
+        u1p /= u1p[:, 2].reshape(-1, 1)
+        u2p /= u2p[:, 2].reshape(-1, 1)
     
     calibrated_correspondences = np.c_[u1p, u2p]
     return calibrated_correspondences
+
+
+def calibrate_features(u, K):
+    u_p = e2p(u)
+    return np.linalg.inv(K) @ u_p
 
 
 def zero_one_support(distances, theta):
@@ -64,6 +74,10 @@ def p2e(X):
     # out shape = (D - 1, N)
     X = np.array(X)
     return X[:-1] / X[-1]
+
+
+def e2p(X):
+    return np.vstack((X, np.ones((1, X.shape[1]))))
 
 
 def Pu2X(P1, P2, u1p, u2p):
@@ -231,7 +245,7 @@ def inliers_in_front_camera(correspondences, inliers, P1, P2):
     return inliers
 
 
-def epipolar_ransac(correspondences, n_iters, support_function=mle_support, theta=0.00001, n_samples=5, K=None):
+def p5_ransac(correspondences, n_iters, support_function=mle_support, theta=1e-4, n_samples=5, K=None):
     N = len(correspondences)
     support_best = 0
     P2_best = None
@@ -311,23 +325,91 @@ def get_P1():
     return P1
 
 
-def reconstruct_point_cloud(correspondences, P1, P2):
+def reconstruct_point_cloud(correspondences, inliers, P1, P2, corretion=True):
     u1p = correspondences[:, 0:3].T
     u2p = correspondences[:, 3:6].T
 
-    _, sampson_vectors = sampson_error(correspondences, P1, P2, True)
-
-    # The Golden Standard Method
-    for i, correction_vector in enumerate(sampson_vectors):
-        u1p[[0, 1], i] -= correction_vector[:2]
-        u2p[[0, 1], i] -= correction_vector[2:]
-
+    if corretion:
+        # The Golden Standard Method
+        _, sampson_vectors = sampson_error(correspondences, P1, P2, True)
+        for i, correction_vector in enumerate(sampson_vectors):
+            u1p[[0, 1], i] -= correction_vector[:2]
+            u2p[[0, 1], i] -= correction_vector[2:]
 
     X = Pu2X(P1, P2, u1p, u2p)
     X = p2e(X)
 
-    mask_in_front = X[:, -2] > 0
+    mask_in_front = X[2] > 0
+    new_inliers = inliers & mask_in_front
     
-    X = X[mask_in_front]
+    X = X[:, new_inliers]
 
-    return X
+    return X, new_inliers
+
+
+def p3p_ransac(X, u, X2U_idx, K, p=0.99999, theta=2):
+    up_K = calibrate_features(u, K)
+    up = e2p(u)
+    
+    X = e2p(X)
+    
+    N = X2U_idx.shape[1]
+    
+    support_best = 0
+    R_best = None
+    t_best = None
+    inliers_best = None
+
+    N_max = 9999
+    N_iter = 0
+
+    X_inliers = X[:, X2U_idx[0]]
+    up_inliers = up[:, X2U_idx[1]]
+
+    while N_iter <= N_max:
+        indices = np.random.choice(N, 3, replace=False)
+        X_idx = X2U_idx[0, indices]
+        U_idx = X2U_idx[1, indices]
+
+        X_i = X[:, X_idx]
+        upK_i = up_K[:, U_idx]
+
+        solutions = p3p.p3p_grunert(X_i, upK_i)
+
+        for X_j in solutions:
+            R_j, t_j = p3p.XX2Rt_simple(X_i, X_j)
+            P_j = K @ np.c_[R_j, t_j]
+            
+            up_pred = P_j @ X_inliers
+
+            # select only points that are in front of the camera
+            # inliers_front = up_pred[2] > 0
+            # errors = euclidean_reprojection_error(up_inliers[:, inliers_front], up_pred[:, inliers_front])
+
+            errors = euclidean_reprojection_error(up_inliers, up_pred)
+
+            support, inliers = mle_support(errors, theta)
+
+            if support > support_best:
+                support_best = support
+                R_best = R_j
+                t_best = t_j
+                inliers_best = inliers
+
+                print(support_best)
+
+                # eps = 1 - np.mean(inliers)
+                # N_max = 0 if eps < 1e-8 else math.log(1 - p) / math.log(1 - (1 - eps) ** 3)
+
+
+        N_iter += 1
+
+    return R_best, t_best, inliers_best
+
+
+def euclidean_reprojection_error(u_true, u_pred):
+    u_true = p2e(u_true)
+    u_pred = p2e(u_pred)
+    diffs = u_pred - u_true
+    errors = np.sum(diffs ** 2, axis=0)
+    return errors

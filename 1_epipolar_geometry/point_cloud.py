@@ -17,7 +17,7 @@ K = np.loadtxt(f'scene/K.txt')
 correspondences = get_correspondences(matches, points_1, points_2)
 inverse_correspondences = correspondences[:, [2, 3, 0, 1]]
 calibrated_correspondences = calibrate_correspondences(correspondences, K)
-P2, E, inliers = epipolar_ransac(calibrated_correspondences, 20, theta=1e-3, K=K)
+P2, E, inliers = p5_ransac(calibrated_correspondences, 20, theta=1e-3, K=K)
 F = calc_F(K, E)
 P1 = get_P1()
 
