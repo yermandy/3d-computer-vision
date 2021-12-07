@@ -47,14 +47,15 @@ def show_epipolar_lines(correspondences, F, ax1, ax2, width, height, n_lines=10)
         show_line(l2, width, height, ax2)
 
 
-def show_camera_3d(ax, P):
-    R, С = P[:, :3], -P[:, 3]
+def show_camera_3d(ax, P, text=''):
+    R, C = P[:, :3], -P[:, 3]
 
-    ax.quiver(*С, *(R.T @ ([1, 0, 0])), color='b', arrow_length_ratio=0.2)
-    ax.quiver(*С, *(R.T @ ([0, 1, 0])), color='g', arrow_length_ratio=0.2)
-    ax.quiver(*С, *(R.T @ ([0, 0, 1])), color='r', arrow_length_ratio=0.2)
-
-    ax.scatter(*С, c='k')
+    ax.quiver(*C, *(R.T @ ([1, 0, 0])), color='b', arrow_length_ratio=0.2)
+    ax.quiver(*C, *(R.T @ ([0, 1, 0])), color='g', arrow_length_ratio=0.2)
+    ax.quiver(*C, *(R.T @ ([0, 0, 1])), color='r', arrow_length_ratio=0.2)
+    
+    ax.text(*(C + -1e-1), text)
+    ax.scatter(*C, c='k')
 
 
 def create_3d_plot(plt):
@@ -69,7 +70,7 @@ def create_3d_plot(plt):
 
 
 def show_point_cloud(X, ax):
-    ax.scatter(X[0], X[1], X[2], marker='.')
+    ax.scatter(X[0], X[1], X[2], marker='.', s=3)
 
 
 if __name__ == '__main__':
