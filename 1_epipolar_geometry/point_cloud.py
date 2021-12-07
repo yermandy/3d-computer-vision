@@ -21,7 +21,7 @@ P2, E, inliers = p5_ransac(calibrated_correspondences, 20, theta=1e-3, K=K)
 F = calc_F(K, E)
 P1 = get_P1()
 
-X = reconstruct_point_cloud(calibrated_correspondences[inliers], P1, P2)
+X, inliers = reconstruct_point_cloud(calibrated_correspondences, inliers, P1, P2)
 
 print(X.shape)
 

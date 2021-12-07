@@ -104,24 +104,9 @@ for verified_camera_id in verified_cameras:
     points_2 = np.loadtxt(f'scene/matches/u_{next_camera_id:02d}.txt')
 
     matches = np.c_[c_idx_j, c_idx_i]
-    correspondences = get_correspondences(matches, points_1, points_2)
-    calibrated_correspondences = calibrate_correspondences(correspondences, K)
+    correspondences = get_correspondences(matches, points_1, points_2, projective=True)
 
-    #! method 1
-    # points_1 = np.loadtxt(f'scene/matches/u_{verified_camera_id:02d}.txt')[c_idx_j]
-    # points_2 = np.loadtxt(f'scene/matches/u_{next_camera_id:02d}.txt')[c_idx_i]
-    # points_1 = np.linalg.inv(K) @ e2p(points_1.T)
-    # points_2 = np.linalg.inv(K) @ e2p(points_2.T)
-    # calibrated_correspondences = np.r_[points_1, points_2].T
-
-    # points_1 = points_1.T
-    # points_2 = points_2.T
-    # correspondences = np.r_[points_1, points_2].T
-    # calibrated_correspondences = calibrate_correspondences(correspondences, K)
-
-    # c.new_x(next_camera_id, verified_camera_id)
-
-    inliers, X_new = reconstruct_point_cloud_2(calibrated_correspondences, P_i, P_j)
+    inliers, X_new = reconstruct_point_cloud_2(correspondences, K @ P_i, K @ P_j, theta=2)
     # Xj = reconstruct_point_cloud(calibrated_correspondences, inliers3, P1, P2, corretion=True)
 
     X = np.hstack((X, X_new))

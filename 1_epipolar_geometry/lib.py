@@ -14,12 +14,15 @@ def lines_intersection(l1, l2):
     return x
 
 
-def get_correspondences(matches, points_1, points_2):
+def get_correspondences(matches, points_1, points_2, projective=False):
     correspondences = []
     for i, j in matches:
         x1, y1 = points_1[i]
         x2, y2 = points_2[j]
-        correspondences.append([x1, y1, x2, y2])
+        if projective:
+            correspondences.append([x1, y1, 1, x2, y2, 1])
+        else:
+            correspondences.append([x1, y1, x2, y2])
     correspondences = np.array(correspondences)
     return correspondences
 
@@ -255,6 +258,8 @@ def p5_ransac(correspondences, n_iters, support_function=mle_support, theta=1e-4
     N = len(correspondences)
     support_best = 0
     P2_best = None
+    R_best = None
+    t_best = None
     E_best = None
     inliers_best = None
 
@@ -287,6 +292,8 @@ def p5_ransac(correspondences, n_iters, support_function=mle_support, theta=1e-4
             
             if support > support_best:
                 support_best = support
+                R_best = R
+                t_best = t
                 P2_best = P2
                 E_best = E
                 inliers_best = inliers
@@ -353,7 +360,7 @@ def reconstruct_point_cloud(correspondences, inliers, P1, P2, corretion=True):
     return X, new_inliers
 
 
-def reconstruct_point_cloud_2(correspondences, P1, P2, theta=1e-5, corretion=True):
+def reconstruct_point_cloud_2(correspondences, P1, P2, theta=2, corretion=True):
     u1p = correspondences[:, 0:3].T
     u2p = correspondences[:, 3:6].T
 
