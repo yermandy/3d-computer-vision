@@ -379,10 +379,6 @@ def reconstruct_point_cloud_2(correspondences, P1, P2, theta=2, corretion=True):
 
     inliers = errors < theta
 
-    # print(errors)
-
-    print('inliers sum ', inliers.sum())
-
     return inliers, X[:, inliers]
 
 

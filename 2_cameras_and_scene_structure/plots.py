@@ -49,6 +49,7 @@ def show_epipolar_lines(correspondences, F, ax1, ax2, width, height, n_lines=10)
 
 def show_camera_3d(ax, P, text=''):
     R, C = P[:, :3], -P[:, 3]
+    C[-1] *= -1
 
     ax.quiver(*C, *(R.T @ ([1, 0, 0])), color='b', arrow_length_ratio=0.2)
     ax.quiver(*C, *(R.T @ ([0, 1, 0])), color='g', arrow_length_ratio=0.2)

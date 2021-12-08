@@ -5,7 +5,7 @@ import corresp
 import os
 from easydict import EasyDict as dict
 
-def initialize_c(N=12, verbose=1):
+def initialize_c(N=12, verbose=0):
     c = corresp.Corresp(N + 1)
     c.verbose = verbose
 
@@ -23,13 +23,8 @@ K = np.loadtxt(f'scene/K.txt')
 
 matches = np.array(c.get_m(image_id_1, image_id_2)).T
 
-image_1 = plt.imread(f'scene/images/{image_id_1:02d}.jpg')
-image_2 = plt.imread(f'scene/images/{image_id_2:02d}.jpg')
-height, width = image_1.shape[0], image_1.shape[1]
-
 points_1 = np.loadtxt(f'scene/matches/u_{image_id_1:02d}.txt')
 points_2 = np.loadtxt(f'scene/matches/u_{image_id_2:02d}.txt')
-
 
 correspondences = get_correspondences(matches, points_1, points_2)
 calibrated_correspondences = calibrate_correspondences(correspondences, K)
@@ -56,93 +51,112 @@ c.start(image_id_1, image_id_2, inliers_idx)
 # print(c.get_Xu(3))
 # X2U_idx
 
-
-next_camera_id = 3
-
-X2U_idx = np.array(c.get_Xu(next_camera_id)[0:2])
-print(X2U_idx)
-print(X2U_idx.shape)
-# print(u3.shape)
-u3 = np.loadtxt(f'scene/matches/u_{next_camera_id:02d}.txt').T
-R3, t3, inliers3 = p3p_ransac(X, u3, X2U_idx, K)
-P3 = np.c_[R3, t3]
-
 cameras = {}
 cameras[7] = dict({'P': P1})
 cameras[11] = dict({'P': P2})
+cameras[7].X_idx = np.arange(0, X.shape[1])
 
-cameras[next_camera_id] = dict({'P': P3})
+for i in range(10):
+    cameras_next, cameras_points = c.get_green_cameras()
 
+    camera_i = cameras_next[np.argmax(cameras_points)]
 
-new_inliers_indices = np.flatnonzero(inliers3)
+    X2U_idx = np.array(c.get_Xu(camera_i)[0:2])
 
-c.join_camera(next_camera_id, new_inliers_indices)
+    print(f'camera {camera_i} p3p')
 
-verified_cameras = c.get_cneighbours(next_camera_id)
+    u3 = np.loadtxt(f'scene/matches/u_{camera_i:02d}.txt').T
+    R3, t3, inliers3 = p3p_ransac(X, u3, X2U_idx, K)
+    P3 = np.c_[R3, t3]
+    cameras[camera_i] = dict({'P': P3})
 
-X_from_two = X.copy()
+    new_inliers_indices = np.flatnonzero(inliers3)
 
-P_j = P3
+    c.join_camera(camera_i, new_inliers_indices)
 
-for verified_camera_id in verified_cameras:
+    P_j = P3
+
+    n_X_from = X.shape[1]
+
+    for camera_j in c.get_cneighbours(camera_i):
+
+        print(f'\ntriangulation {camera_i} -> {camera_j}')
+        
+        P_i = cameras[camera_j].P
+
+        c_idx_i, c_idx_j = np.array(c.get_m(camera_i, camera_j))
+
+        points_1 = np.loadtxt(f'scene/matches/u_{camera_j:02d}.txt')
+        points_2 = np.loadtxt(f'scene/matches/u_{camera_i:02d}.txt')
+
+        matches = np.c_[c_idx_j, c_idx_i]
+        correspondences = get_correspondences(matches, points_1, points_2, projective=True)
+
+        inliers, Xj = reconstruct_point_cloud_2(correspondences, K @ P_i, K @ P_j, theta=2)
+
+        print('inliers: ', inliers.sum())
+
+        X = np.hstack((X, Xj))
+
+        inliers = np.flatnonzero(inliers)
+
+        c.new_x(camera_i, camera_j, inliers)
+
+    n_X_till = X.shape[1]
+        
+    ilist = c.get_selected_cameras();
+
+    for camera_j in c.get_selected_cameras():
+
+        X_idx, u_idx, Xu_verified = c.get_Xu(camera_j)
+        Xu_tentative = ~Xu_verified
+        
+        if Xu_tentative.sum() == 0:
+            continue
+
+        print(f'\nverification {camera_j}')
+
+        Xu_tentative_idx = np.flatnonzero(Xu_tentative)
+
+        X_idx, u_idx = X_idx[Xu_tentative], u_idx[Xu_tentative]
+
+        u_true = np.loadtxt(f'scene/matches/u_{camera_j:02d}.txt')[u_idx]
+        up_true = e2p(u_true.T)
+
+        X_j = X[:, X_idx]
+        X_j = e2p(X_j)
+
+        P_j = cameras[camera_j].P
+        P_j = K @ P_j
+                
+        up_pred = P_j @ X_j
+
+        errors = euclidean_reprojection_error(up_true, up_pred)
+
+        threshold = 1
+        
+        mask = errors <= threshold
+        
+        inliers = Xu_tentative_idx[mask]
+
+        print(f'inliers {camera_j}: {np.sum(mask)}')
+        
+        c.verify_x(camera_j, inliers)
     
-
-    P_i = cameras[verified_camera_id].P
-
-    c_idx_i, c_idx_j = np.array(c.get_m(next_camera_id, verified_camera_id))
-
-    print('correspondences')
-    print(correspondences.shape)
-    # calibrated_correspondences = calibrate_correspondences(correspondences, K)
-
-    # print(calibrated_correspondences.shape)
-    print('inliers3.shape')
-    print(inliers3.shape)
-
-
-    points_1 = np.loadtxt(f'scene/matches/u_{verified_camera_id:02d}.txt')
-    points_2 = np.loadtxt(f'scene/matches/u_{next_camera_id:02d}.txt')
-
-    matches = np.c_[c_idx_j, c_idx_i]
-    correspondences = get_correspondences(matches, points_1, points_2, projective=True)
-
-    inliers, X_new = reconstruct_point_cloud_2(correspondences, K @ P_i, K @ P_j, theta=2)
-    # Xj = reconstruct_point_cloud(calibrated_correspondences, inliers3, P1, P2, corretion=True)
-
-    X = np.hstack((X, X_new))
-
-    inliers = np.flatnonzero(inliers)
-
-    c.new_x(next_camera_id, verified_camera_id, inliers)
-
+    cameras[camera_i].X_idx = np.arange(n_X_from, n_X_till)
+    c.finalize_camera()
 # exit()
-
-
-cameras_next, cameras_points = c.get_green_cameras()
-# exit()
-# print(c.get_cneighbours(next_camera_id))
-
-# c.verify_x(next_camera_id, new_inliers_indices)
-
-# c.finalize_camera()
-
-# print(X2U_idx[1])
-# print(new_inliers)
-
-print()
-
-# exit()
-
-print(X.shape)
 
 fig, ax = create_3d_plot(plt)
-show_point_cloud(X[:, len(X_from_two):], ax)
-show_point_cloud(X_from_two, ax)
 
-show_camera_3d(ax, P1, 7)
-show_camera_3d(ax, P2, 11)
-show_camera_3d(ax, P3, 3)
-
+for idx, camera in cameras.items():
+    show_camera_3d(ax, camera.P, idx)
+    if 'X_idx' in camera:
+        X_j = X[:, camera.X_idx]
+        mask_1 = X_j <= 15
+        mask_2 = X_j >= -15
+        mask = np.sum(mask_1 & mask_2, axis=0) == 3
+        show_point_cloud(X_j[:, mask], ax)
 
 ax.view_init(-90, -90)
 plt.tight_layout()
