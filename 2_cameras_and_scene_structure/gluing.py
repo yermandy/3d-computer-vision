@@ -67,14 +67,12 @@ for i in range(10):
 
     u3 = np.loadtxt(f'scene/matches/u_{camera_i:02d}.txt').T
     R3, t3, inliers3 = p3p_ransac(X, u3, X2U_idx, K)
-    P3 = np.c_[R3, t3]
-    cameras[camera_i] = dict({'P': P3})
+    P_j = np.c_[R3, t3]
+    cameras[camera_i] = dict({'P': P_j})
 
     new_inliers_indices = np.flatnonzero(inliers3)
 
     c.join_camera(camera_i, new_inliers_indices)
-
-    P_j = P3
 
     n_X_from = X.shape[1]
 
