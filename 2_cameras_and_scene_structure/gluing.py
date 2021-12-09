@@ -1,6 +1,6 @@
-from numpy import percentile
 from plots import *
 from lib import *    
+from utils import *    
 import corresp
 import os
 from easydict import EasyDict as dict
@@ -51,9 +51,15 @@ c.start(image_id_1, image_id_2, inliers_idx)
 # print(c.get_Xu(3))
 # X2U_idx
 
+
 cameras = {}
-cameras[7] = dict({'P': P1})
-cameras[11] = dict({'P': P2})
+
+for i in range(1, 13):
+    cameras[i] = dict()
+    cameras[i].features = np.loadtxt(f'scene/matches/u_{i:02d}.txt')
+
+cameras[7].P = P1
+cameras[11].P = P2
 cameras[7].X_idx = np.arange(0, X.shape[1])
 
 for i in range(10):
@@ -67,8 +73,8 @@ for i in range(10):
 
     u3 = np.loadtxt(f'scene/matches/u_{camera_i:02d}.txt').T
     R3, t3, inliers3 = p3p_ransac(X, u3, X2U_idx, K)
-    P_j = np.c_[R3, t3]
-    cameras[camera_i] = dict({'P': P_j})
+    P_i = np.c_[R3, t3]
+    cameras[camera_i].P = P_i
 
     new_inliers_indices = np.flatnonzero(inliers3)
 
@@ -76,21 +82,22 @@ for i in range(10):
 
     n_X_from = X.shape[1]
 
+    points_2 = cameras[camera_i].features
+
     for camera_j in c.get_cneighbours(camera_i):
 
         print(f'\ntriangulation {camera_i} -> {camera_j}')
         
-        P_i = cameras[camera_j].P
+        P_j = cameras[camera_j].P
 
         c_idx_i, c_idx_j = np.array(c.get_m(camera_i, camera_j))
 
-        points_1 = np.loadtxt(f'scene/matches/u_{camera_j:02d}.txt')
-        points_2 = np.loadtxt(f'scene/matches/u_{camera_i:02d}.txt')
+        points_1 = cameras[camera_j].features
 
         matches = np.c_[c_idx_j, c_idx_i]
         correspondences = get_correspondences(matches, points_1, points_2, projective=True)
 
-        inliers, Xj = reconstruct_point_cloud_2(correspondences, K @ P_i, K @ P_j, theta=2)
+        inliers, Xj = reconstruct_point_cloud_2(correspondences, K @ P_j, K @ P_i, theta=2)
 
         print('inliers: ', inliers.sum())
 
@@ -118,7 +125,8 @@ for i in range(10):
 
         X_idx, u_idx = X_idx[Xu_tentative], u_idx[Xu_tentative]
 
-        u_true = np.loadtxt(f'scene/matches/u_{camera_j:02d}.txt')[u_idx]
+        # u_true = np.loadtxt(f'scene/matches/u_{camera_j:02d}.txt')[u_idx]
+        u_true = cameras[camera_j].features[u_idx]
         up_true = e2p(u_true.T)
 
         X_j = X[:, X_idx]
@@ -147,6 +155,8 @@ for i in range(10):
 
 fig, ax = create_3d_plot(plt)
 
+X_save = []
+
 for idx, camera in cameras.items():
     show_camera_3d(ax, camera.P, idx)
     if 'X_idx' in camera:
@@ -154,9 +164,15 @@ for idx, camera in cameras.items():
         mask_1 = X_j <= 15
         mask_2 = X_j >= -15
         mask = np.sum(mask_1 & mask_2, axis=0) == 3
-        show_point_cloud(X_j[:, mask], ax)
+        X_j = X_j[:, mask]
+        X_save.append(X_j)
+        show_point_cloud(X_j, ax)
+X_save = np.hstack(X_save)
 
 ax.view_init(-90, -90)
 plt.tight_layout()
 plt.subplots_adjust(0, 0, 1, 1)
 plt.show()
+
+
+save_points(X_save, cameras)
