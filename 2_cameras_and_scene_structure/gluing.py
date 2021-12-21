@@ -5,13 +5,15 @@ import corresp
 import os
 from easydict import EasyDict as dict
 
+scene_root = 'scene'
+
 def initialize_c(N=12, verbose=0):
     c = corresp.Corresp(N + 1)
     c.verbose = verbose
 
     for i in range(1, N + 1):
         for j in range(i + 1, N + 1):
-            matches = np.loadtxt(f'scene/matches/m_{i:02d}_{j:02d}.txt').astype(int)
+            matches = np.loadtxt(f'{scene_root}/matches/m_{i:02d}_{j:02d}.txt').astype(int)
             c.add_pair(i, j, matches)
 
     return c
@@ -19,12 +21,12 @@ def initialize_c(N=12, verbose=0):
 image_id_1 = 7
 image_id_2 = 11
 c = initialize_c()
-K = np.loadtxt(f'scene/K.txt')
+K = np.loadtxt(f'{scene_root}/K.txt')
 
 matches = np.array(c.get_m(image_id_1, image_id_2)).T
 
-points_1 = np.loadtxt(f'scene/matches/u_{image_id_1:02d}.txt')
-points_2 = np.loadtxt(f'scene/matches/u_{image_id_2:02d}.txt')
+points_1 = np.loadtxt(f'{scene_root}/matches/u_{image_id_1:02d}.txt')
+points_2 = np.loadtxt(f'{scene_root}/matches/u_{image_id_2:02d}.txt')
 
 correspondences = get_correspondences(matches, points_1, points_2)
 calibrated_correspondences = calibrate_correspondences(correspondences, K)
@@ -56,7 +58,7 @@ cameras = {}
 
 for i in range(1, 13):
     cameras[i] = dict()
-    cameras[i].features = np.loadtxt(f'scene/matches/u_{i:02d}.txt')
+    cameras[i].features = np.loadtxt(f'{scene_root}/matches/u_{i:02d}.txt')
 
 cameras[7].P = P1
 cameras[11].P = P2
@@ -71,7 +73,7 @@ for i in range(10):
 
     print(f'camera {camera_i} p3p')
 
-    u3 = np.loadtxt(f'scene/matches/u_{camera_i:02d}.txt').T
+    u3 = np.loadtxt(f'{scene_root}/matches/u_{camera_i:02d}.txt').T
     R3, t3, inliers3 = p3p_ransac(X, u3, X2U_idx, K)
     P_i = np.c_[R3, t3]
     cameras[camera_i].P = P_i
@@ -125,7 +127,6 @@ for i in range(10):
 
         X_idx, u_idx = X_idx[Xu_tentative], u_idx[Xu_tentative]
 
-        # u_true = np.loadtxt(f'scene/matches/u_{camera_j:02d}.txt')[u_idx]
         u_true = cameras[camera_j].features[u_idx]
         up_true = e2p(u_true.T)
 

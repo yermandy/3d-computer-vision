@@ -395,7 +395,7 @@ def p3p_ransac(X, u, X2U_idx, K, p=0.99999, theta=2):
     t_best = None
     inliers_best = None
 
-    N_max = 1000
+    N_max = 5000
     N_iter = 0
 
     X_inliers = X[:, X2U_idx[0]]
