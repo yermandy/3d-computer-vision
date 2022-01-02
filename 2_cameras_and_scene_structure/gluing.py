@@ -3,7 +3,10 @@ from lib import *
 from utils import *    
 import corresp
 import os
+import pickle
 from easydict import EasyDict as dict
+
+os.makedirs('cache', exist_ok=True)
 
 scene_root = 'scene'
 
@@ -153,6 +156,12 @@ for i in range(10):
     cameras[camera_i].X_idx = np.arange(n_X_from, n_X_till)
     c.finalize_camera()
 # exit()
+
+with open('cache/cameras.pickle', 'wb') as f:
+    pickle.dump(cameras, f)
+
+with open('cache/c.pickle', 'wb') as f:
+    pickle.dump(c, f)
 
 fig, ax = create_3d_plot(plt)
 
