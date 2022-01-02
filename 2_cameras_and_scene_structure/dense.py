@@ -113,8 +113,8 @@ D = D['D']
 X_all = []
 colors_all = []
 
-for i, (c1, c2) in enumerate([(1, 2), (2, 3), (3, 4)]):
-# for i, (c1, c2) in enumerate(pairs):
+# for i, (c1, c2) in enumerate([(1, 2), (2, 3), (3, 4)]):
+for i, (c1, c2) in enumerate(pairs):
     print('pair:', c1, c2)
 
     P1 = K @ cameras[c1].P
@@ -174,7 +174,7 @@ for i, (c1, c2) in enumerate([(1, 2), (2, 3), (3, 4)]):
     for (x1, y1), (x2, y2) in zip(u1.T, u2.T):
         correspondences.append([x1, y1, 1, x2, y2, 1])
         # color = (img_1[round(y1), round(x1)] + img_2[round(y2), round(x2)]) / 2
-        color = img_1[round(y1), round(x1)]
+        color = img_1[int(y1), int(x1)]
         colors.append(color)
     colors = np.array(colors).T
     correspondences = np.array(correspondences)
