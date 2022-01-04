@@ -84,16 +84,20 @@ if not os.path.isfile('stereo_out.mat'):
 
         # region debug homographies
 
+        # height, width = img_1_rect.shape
         # u1_r = u1_r.T
         # u2_r = u2_r.T
         # fig, axs = plt.subplots(1, 2, figsize=(10,5))
         # axs[0].imshow(img_1_rect, cmap='gray')
         # axs[1].imshow(img_2_rect, cmap='gray')
-        # for i in range(0, len(u1_r), 50):
+        # indices = np.random.choice(range(len(u1_r)), size=10, replace=False)
+        # for i in indices:
         #     x, y = u1_r[i]
         #     axs[0].scatter(x, y, marker='.')
+        #     axs[0].plot([0, width], [y, y])
         #     x, y = u2_r[i]
         #     axs[1].scatter(x, y, marker='.')
+        #     axs[1].plot([0, width], [y, y])
         # plt.tight_layout()
         # plt.show()
 
@@ -130,7 +134,17 @@ for i, (c1, c2) in enumerate(pairs):
     y, x = np.where(not_nan)
     u1 = np.array([x, y])
     u2 = np.array([x + Di[y, x], y])
-    
+
+    # region disparities
+    # fig, axs = plt.subplots(1, 3, figsize=(20,10))
+    # Di[np.isnan(Di)] = 0
+    # axs[0].imshow(img_1_rect, cmap='gray')
+    # axs[1].imshow(Di)
+    # axs[2].imshow(img_2_rect, cmap='gray')
+    # plt.tight_layout()
+    # plt.show()
+    # endregion 
+
     # region debug new rectified correspondences
     # u1 = u1.T
     # u2 = u2.T
