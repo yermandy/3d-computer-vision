@@ -35,7 +35,7 @@ correspondences = get_correspondences(matches, points_1, points_2)
 calibrated_correspondences = calibrate_correspondences(correspondences, K)
 
 if not os.path.isfile('cache/E.npy') or not os.path.isfile('cache/P2.npy') or not os.path.isfile('cache/inliers.npy'):
-    P2, E, inliers = p5_ransac(calibrated_correspondences, 25, theta=1e-4, K=K)
+    P2, E, inliers = p5_ransac(calibrated_correspondences, 100)
     # np.save('cache/P2.npy', P2)
     # np.save('cache/E.npy', E)
     # np.save('cache/inliers.npy', inliers)

@@ -31,6 +31,7 @@ def calibrate_correspondences(correspondences, K, normalize=False):
     u1, u2 = correspondences[:, [0, 1]], correspondences[:, [2, 3]]
     u1p = np.c_[u1, np.ones(len(u1))]
     u2p = np.c_[u2, np.ones(len(u2))]
+    
     K_inv = np.linalg.inv(K)
 
     u1p = (K_inv @ u1p.T).T
@@ -118,53 +119,70 @@ def Pu2X(P1, P2, u1p, u2p):
     return X
 
 
-def Eu2Rt(E, u1p, u2p):
+def check_cheirality(X, u1p, u2p):
+    in_front_of_C1 = np.einsum('ij, ij -> j', u1p, X) > 0
+    in_front_of_C2 = np.einsum('ij, ij -> j', u2p, X) > 0
+    return in_front_of_C1 & in_front_of_C2
+
+
+def Eu2RC(E, u1p, u2p):
     # Essential matrix decomposition with cheirality constraint: 
     #   all 3D points are in front of both cameras
-    #   see 9.6.3 in book
+    #   see 9.6.2, 9.6.3 in book
     assert E.shape == (3, 3)
     assert u1p.shape[0] == 3
     assert u2p.shape[0] == 3
 
     U, D, V_t = np.linalg.svd(E)
+    V = V_t.T
     
-    R = np.diag([1, 1 ,1])
-    t = np.array([0, 0, 0])
+    R = np.eye(3)
+    C = np.zeros(3)
 
-    P1 = np.c_[R, t]
-
+    P1 = np.c_[R, C]
+    
+    R_best = None
+    C_best = None
+    
+    in_front_of_both_best = -np.inf
+    
     for a in [-1, 1]:
+        W = np.array([
+            [0,  a, 0],
+            [-a, 0, 0],
+            [0,  0, 1]
+        ])
+        R = U @ W @ V_t
+        
         for b in [-1, 1]:
-            W = np.array([
-                [0, a, 0],
-                [-a, 0, 0],
-                [0, 0, 1]
-            ])
-            
-            R = U @ W @ V_t
             t = b * U[:, -1]
+            C_another = R.T @ t
+            # print(C_another)
             
-            # Should it be here?
-            if np.linalg.det(R) < 0:
-                R = -R
-                t = -t
+            C = b * V[:, -1]
+            # print(C)
+            # print()
+            
+            # wow, what a discovery!
+            # C = b * R^-1 @ u_3 = b * R^T @ u_3 = b * v_3
+            
+            P2 = np.c_[R, -R @ C]
 
-            P2 = np.c_[R, t]
-
-            # cheirality constraint https://cmsc426.github.io/sfm/#tri
             X = Pu2X(P1, P2, u1p, u2p)
-            X /= X[-1]
-
-            if np.any(X[2] < 0):
-                continue
-            
             X = p2e(X)
-            cheirality = R[2] @ (X - t.reshape(-1, 1))
+            
+            check_cheirality(X, u1p, u2p)
+                                    
+            in_front_of_C1 = np.einsum('ij, ij -> j', u1p, X) > 0
+            in_front_of_C2 = np.einsum('ij, ij -> j', u2p, X) > 0
+            in_front_of_both = (in_front_of_C1 & in_front_of_C2).sum()
+                        
+            if in_front_of_both > in_front_of_both_best:
+                in_front_of_both_best = in_front_of_both
+                R_best = R
+                C_best = C
 
-            if np.all(cheirality > 0):
-                return R, t
-    
-    return None, None
+    return R_best, C_best
 
 
 def reprojection_error(UV, P1, P2, return_X=False):
@@ -247,26 +265,25 @@ def inliers_in_front_camera(correspondences, inliers, P1, P2):
 
     X = Pu2X(P1, P2, u1p, u2p)
     X = p2e(X)
+    
+    mask_in_front = check_cheirality(X, u1p, u2p)
 
-    mask_in_front = X[2] > 0
     inliers = inliers & mask_in_front
     
     return inliers
 
 
-def p5_ransac(correspondences, n_iters, support_function=mle_support, theta=1e-4, n_samples=5, K=None):
+def p5_ransac(correspondences, n_iters, support_function=mle_support, theta=1e-4, K=None):
     N = len(correspondences)
     support_best = 0
     P2_best = None
-    R_best = None
-    t_best = None
     E_best = None
     inliers_best = None
 
     P1 = get_P1()
     
     for _ in range(n_iters):
-        indices = np.random.choice(N, n_samples, replace=False)
+        indices = np.random.choice(N, 5, replace=False)
         sample = correspondences[indices]
 
         u1p = sample[:, 0:3].T
@@ -275,12 +292,12 @@ def p5_ransac(correspondences, n_iters, support_function=mle_support, theta=1e-4
         Es = p5.p5gb(u1p, u2p)
 
         for E in Es:            
-            R, t = Eu2Rt(E, u1p, u2p)
+            R, C = Eu2RC(E, u1p, u2p)
 
             if R is None:
                 continue
 
-            P2 = np.c_[R, t]
+            P2 = np.c_[R, -R @ C]
             
             # calculate sampson error
             error = sampson_error(correspondences, P1, P2)
@@ -292,8 +309,6 @@ def p5_ransac(correspondences, n_iters, support_function=mle_support, theta=1e-4
             
             if support > support_best:
                 support_best = support
-                R_best = R
-                t_best = t
                 P2_best = P2
                 E_best = E
                 inliers_best = inliers
@@ -334,7 +349,7 @@ def Rz(alpha):
 
 
 def get_P1():
-    P1 = np.c_[np.diag([1, 1 ,1]), [0, 0, 0]]
+    P1 = np.c_[np.eye(3), np.zeros(3)]
     return P1
 
 

@@ -17,7 +17,7 @@ K = np.loadtxt(f'scene/K.txt')
 correspondences = get_correspondences(matches, points_1, points_2)
 inverse_correspondences = correspondences[:, [2, 3, 0, 1]]
 calibrated_correspondences = calibrate_correspondences(correspondences, K)
-P2, E, inliers = p5_ransac(calibrated_correspondences, 25)
+P2, E, inliers = p5_ransac(calibrated_correspondences, 50)
 F = calc_F(K, E)
 
 fig, axes = plt.subplots(2, 2)
